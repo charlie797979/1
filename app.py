@@ -30,7 +30,7 @@ def secret(name):
 
 
 ss = st.session_state
-ss.setdefault("items", [])
+ss.setdefault("articles", [])
 ss.setdefault("search_id", 0)
 ss.setdefault("stats", "")
 ss.setdefault("result", None)
@@ -88,7 +88,7 @@ if st.button("기사 검색", type="primary"):
         n_excluded = total - len(kept)
         unique = core.dedupe(kept, strip_words=keywords)
         unique.sort(key=lambda x: x["pub"], reverse=True)
-        ss.items = unique
+        ss.articles = unique
         ss.search_id += 1
         ss.result = None
         ss.stats = f"검색 {total}건 · 제외 {n_excluded}건 · 중복 {len(kept) - len(unique)}건 → {len(unique)}건"
@@ -96,12 +96,12 @@ if st.button("기사 검색", type="primary"):
             st.warning("검색에 실패한 키워드: " + ", ".join(failed))
 
 # 검색 결과 표
-if ss.items:
+if ss.articles:
     st.caption(ss.stats)
     table = pd.DataFrame({
-        "선택": [False] * len(ss.items),  # 전부 해제 상태로 시작
-        "기사발행일": [a["pub"].strftime("%Y.%m.%d") for a in ss.items],
-        "제목": [a["title"] for a in ss.items],
+        "선택": [False] * len(ss.articles),  # 전부 해제 상태로 시작
+        "기사발행일": [a["pub"].strftime("%Y.%m.%d") for a in ss.articles],
+        "제목": [a["title"] for a in ss.articles],
     })
     edited = st.data_editor(
         table,
@@ -118,7 +118,7 @@ if ss.items:
 
     # 요약하기
     if st.button("요약하기", type="primary"):
-        picked = [ss.items[i] for i in edited.index[edited["선택"]]]
+        picked = [ss.articles[i] for i in edited.index[edited["선택"]]]
         if not picked:
             st.warning("요약할 기사를 먼저 체크해 주세요.")
         else:
