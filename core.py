@@ -121,29 +121,58 @@ def fetch_body(url):
         return ""
 
 
+MAX_LEN = 100  # 요약 최대 글자 수(공백 포함)
+
+
+def _one_line(text, title=""):
+    text = re.sub(r"\s+", " ", text or "").strip() or title
+    if len(text) > MAX_LEN:  # 길면 첫 문장만
+        m = re.match(r"(.+?[.!?다])(\s|$)", text)
+        if m and len(m.group(1)) >= 15:
+            text = m.group(1)
+    return text
+
+
+def _cut_plain(text):
+    """AI를 쓸 수 없을 때만: '…' 없이 단어 경계에서 100자 이내로 자름"""
+    if len(text) <= MAX_LEN:
+        return text
+    cut = text[:MAX_LEN]
+    idx = max(cut.rfind(","), cut.rfind(" "))
+    return (cut[:idx] if idx > 40 else cut).rstrip(" ,")
+
+
 def fallback_summary(title, body):
-    sents = re.split(r"(?<=[.!?다])\s+", body) if body else []
-    text = " ".join(sents[:2]).strip()
-    return (text[:120] + "…") if len(text) > 120 else (text or title)
+    return _cut_plain(_one_line(body, title))
 
 
 def summarize(title, body, api_key=None, model=SUMMARY_MODEL):
-    """(요약문, 사용방식) 반환. 사용방식: 'claude' | 'fallback'"""
+    """(요약문, 사용방식) 반환. 사용방식: 'claude' | 'fallback'
+    100자를 넘으면 Claude에게 더 줄여 달라고 다시 요청한다(최대 4회). 말줄임표로 자르지 않음."""
     if api_key:
         try:
             import anthropic
             client = anthropic.Anthropic(api_key=api_key)
+
+            def ask(prompt):
+                msg = client.messages.create(model=model, max_tokens=300,
+                                             messages=[{"role": "user", "content": prompt}])
+                return "".join(b.text for b in msg.content if b.type == "text").strip()
+
             body_part = body if len(body) >= 200 else "(본문 없음: 제목에 있는 내용만으로 요약하고 없는 내용은 추가하지 말 것)"
-            prompt = (
-                "다음 뉴스 기사를 한국어 뉴스 문체(~했다, ~이다)로 1~2문장, 공백 포함 80자 이내로 요약하세요. "
-                "사실 중심으로 쓰고 수식어·추측은 넣지 마세요. 요약문만 출력하세요.\n\n"
+            text = ask(
+                "다음 뉴스 기사의 핵심만 한국어 뉴스 문체(~했다, ~이다)로 딱 한 문장, 공백 포함 70자 이내로 요약하세요. "
+                "누가 무엇을 했는지만 쓰고 수식어·부가 설명·추측은 빼세요. 요약문만 출력하세요.\n\n"
                 f"제목: {title}\n본문: {body_part}"
             )
-            msg = client.messages.create(model=model, max_tokens=300,
-                                         messages=[{"role": "user", "content": prompt}])
-            text = "".join(b.text for b in msg.content if b.type == "text").strip()
-            if text:
-                return text, "claude"
+            for _ in range(4):
+                text = _one_line(text, title)
+                if len(text) <= MAX_LEN:
+                    return text, "claude"
+                text = ask(
+                    f"아래 요약문은 {len(text)}자로 너무 깁니다. 핵심만 남기고 공백 포함 60자 이내 한 문장으로 "
+                    "다시 줄이세요. 요약문만 출력하세요.\n\n" + text
+                )
         except Exception:
             pass
     return fallback_summary(title, body), "fallback"
