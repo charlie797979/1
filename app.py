@@ -93,7 +93,7 @@ def ai_summary(client, article, kw):
     prompt = (
         f"뉴스클리핑 보고서에 넣을 요약을 작성하세요.\n"
         f"- 모니터링 키워드: {kw}\n"
-        f"- 한국어 한 문장, 110~140자, 핵심 사실(누가/무엇을/수치)에 배경이나 목적을 한 가지 덧붙여 구체적으로\n"
+        f"- 한국어 한 문장, 70~110자, 핵심 사실(누가/무엇을/수치)에 배경이나 목적을 한 가지 덧붙여 구체적으로\n"
         f"- 문장은 '~했다.' 형태의 평서문으로 끝내기, 수식어·평가·광고성 표현 제외\n"
         f"- 요약문 한 문장만 출력 (따옴표, 설명, 줄바꿈 금지)\n\n"
         f"제목: {title}\n본문: {body}"
@@ -358,9 +358,8 @@ if st.button("📝 선택한 기사 요약하고 업무파일에 저장", type="
     out, written = xw.write_articles(st.session_state["work_bytes"], by_sheet, work_date)
     st.session_state["work_bytes"] = out
     st.session_state["written"] = written
-    st.session_state["done_name"] = (
-        f"㈜셀바이오휴먼텍 뉴스클리핑 업무파일({datetime.now(ns.KST).month}월_한철희).xlsx"
-    )
+    _today = datetime.now(ns.KST)
+    st.session_state["done_name"] = f"{_today.month}월 {_today.day}일 뉴스 스크랩.xlsx"
 
 if st.session_state.get("written") is not None:
     w = st.session_state["written"]
